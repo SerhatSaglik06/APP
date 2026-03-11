@@ -9,10 +9,13 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
+      "bundleIdentifier": "com.serhatsaglik.caloriesnap",
+      "buildNumber": "1",
       "supportsTablet": true,
       "infoPlist": {
         "NSCameraUsageDescription": "Scan food to track calories",
-        "NSPhotoLibraryUsageDescription": "Choose food photos from gallery"
+        "NSPhotoLibraryUsageDescription": "Choose food photos from gallery",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -46,6 +49,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "587444b9-7459-4fc3-ae64-520cc40c8b75"
+      }
     }
   }
 }
