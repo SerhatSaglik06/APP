@@ -15,11 +15,14 @@ export default function RootLayout() {
         }}
       >
         <Stack.Screen name="index" />
+        <Stack.Screen name="auth" />
+        <Stack.Screen name="home" />
         <Stack.Screen name="focus" />
         <Stack.Screen name="tone" />
         <Stack.Screen name="zodiac" />
         <Stack.Screen name="result" />
         <Stack.Screen name="history" />
+        <Stack.Screen name="settings" />
       </Stack>
     </SafeAreaProvider>
   );

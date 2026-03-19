@@ -20,14 +20,19 @@ interface Reading {
 interface User {
   id: string;
   device_id: string;
+  email: string;
+  username: string;
   zodiac_sign?: string;
   preferred_tone?: string;
-  notification_time?: string;
+  notification_enabled: boolean;
+  notification_time: string;
   free_readings_today: number;
 }
 
 interface AppState {
-  // User state
+  // Auth state
+  isAuthenticated: boolean;
+  isLoading: boolean;
   deviceId: string | null;
   user: User | null;
   
@@ -39,7 +44,6 @@ interface AppState {
   // Reading state
   currentReading: Reading | null;
   readingHistory: Reading[];
-  isLoading: boolean;
   error: string | null;
   
   // Daily limit state
@@ -51,18 +55,26 @@ interface AppState {
   setSelectedFocus: (focus: string) => void;
   setSelectedTone: (tone: string) => void;
   setSelectedZodiac: (zodiac: string | null) => void;
+  setUser: (user: User | null) => void;
+  setIsAuthenticated: (value: boolean) => void;
   
   // API Actions
-  initializeUser: (deviceId: string) => Promise<void>;
+  checkExistingUser: (deviceId: string) => Promise<User | null>;
+  register: (email: string, username: string) => Promise<boolean>;
+  login: (email: string) => Promise<boolean>;
+  logout: () => Promise<void>;
   checkDailyReading: () => Promise<void>;
   generateReading: () => Promise<Reading | null>;
   expandReading: (readingId: string) => Promise<Reading | null>;
   fetchHistory: () => Promise<void>;
+  updateUserSettings: (settings: Partial<User>) => Promise<void>;
   resetSelections: () => void;
 }
 
 export const useAppStore = create<AppState>((set, get) => ({
   // Initial state
+  isAuthenticated: false,
+  isLoading: true,
   deviceId: null,
   user: null,
   selectedFocus: null,
@@ -70,7 +82,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   selectedZodiac: null,
   currentReading: null,
   readingHistory: [],
-  isLoading: false,
   error: null,
   hasFreeReading: true,
   readingsUsed: 0,
@@ -80,30 +91,130 @@ export const useAppStore = create<AppState>((set, get) => ({
   setSelectedFocus: (focus) => set({ selectedFocus: focus }),
   setSelectedTone: (tone) => set({ selectedTone: tone }),
   setSelectedZodiac: (zodiac) => set({ selectedZodiac: zodiac }),
+  setUser: (user) => set({ user }),
+  setIsAuthenticated: (value) => set({ isAuthenticated: value }),
   
-  // Initialize user
-  initializeUser: async (deviceId) => {
+  // Check existing user
+  checkExistingUser: async (deviceId) => {
     try {
-      const response = await fetch(`${API_URL}/api/users/register`, {
+      const response = await fetch(`${API_URL}/api/auth/check`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ device_id: deviceId }),
       });
       
       if (response.ok) {
+        const data = await response.json();
+        if (data.exists && data.user) {
+          set({ 
+            user: data.user, 
+            isAuthenticated: true,
+            selectedZodiac: data.user.zodiac_sign,
+            selectedTone: data.user.preferred_tone || 'motivational',
+            isLoading: false
+          });
+          get().checkDailyReading();
+          return data.user;
+        }
+      }
+      set({ isLoading: false });
+      return null;
+    } catch (error) {
+      console.log('Check user error:', error);
+      set({ isLoading: false });
+      return null;
+    }
+  },
+  
+  // Register new user
+  register: async (email, username) => {
+    const { deviceId } = get();
+    if (!deviceId) return false;
+    
+    set({ isLoading: true, error: null });
+    
+    try {
+      const response = await fetch(`${API_URL}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          email, 
+          username, 
+          device_id: deviceId 
+        }),
+      });
+      
+      if (response.ok) {
         const user = await response.json();
+        await AsyncStorage.setItem('user_email', email);
         set({ 
           user, 
+          isAuthenticated: true, 
+          isLoading: false,
+          selectedTone: user.preferred_tone || 'motivational'
+        });
+        return true;
+      } else {
+        const errorData = await response.json();
+        set({ error: errorData.detail || 'Kayıt başarısız', isLoading: false });
+        return false;
+      }
+    } catch (error) {
+      console.log('Register error:', error);
+      set({ error: 'Bağlantı hatası', isLoading: false });
+      return false;
+    }
+  },
+  
+  // Login user
+  login: async (email) => {
+    const { deviceId } = get();
+    if (!deviceId) return false;
+    
+    set({ isLoading: true, error: null });
+    
+    try {
+      const response = await fetch(`${API_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, device_id: deviceId }),
+      });
+      
+      if (response.ok) {
+        const user = await response.json();
+        await AsyncStorage.setItem('user_email', email);
+        set({ 
+          user, 
+          isAuthenticated: true, 
+          isLoading: false,
           selectedZodiac: user.zodiac_sign,
           selectedTone: user.preferred_tone || 'motivational'
         });
-        
-        // Check daily reading status
         get().checkDailyReading();
+        return true;
+      } else {
+        const errorData = await response.json();
+        set({ error: errorData.detail || 'Giriş başarısız', isLoading: false });
+        return false;
       }
     } catch (error) {
-      console.log('Initialize user error:', error);
+      console.log('Login error:', error);
+      set({ error: 'Bağlantı hatası', isLoading: false });
+      return false;
     }
+  },
+  
+  // Logout
+  logout: async () => {
+    await AsyncStorage.removeItem('user_email');
+    set({ 
+      user: null, 
+      isAuthenticated: false,
+      currentReading: null,
+      readingHistory: [],
+      hasFreeReading: true,
+      readingsUsed: 0
+    });
   },
   
   // Check if user has free reading today
@@ -219,6 +330,27 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch (error) {
       console.log('Fetch history error:', error);
       set({ isLoading: false });
+    }
+  },
+  
+  // Update user settings
+  updateUserSettings: async (settings) => {
+    const { deviceId } = get();
+    if (!deviceId) return;
+    
+    try {
+      const response = await fetch(`${API_URL}/api/users/${deviceId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings),
+      });
+      
+      if (response.ok) {
+        const user = await response.json();
+        set({ user });
+      }
+    } catch (error) {
+      console.log('Update settings error:', error);
     }
   },
   

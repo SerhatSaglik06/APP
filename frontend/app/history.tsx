@@ -116,7 +116,7 @@ export default function HistoryScreen() {
       <Text style={styles.emptySubtitle}>İlk yorumunu almak için ana sayfaya dön</Text>
       <TouchableOpacity
         style={styles.emptyButton}
-        onPress={() => router.replace('/')}
+        onPress={() => router.replace('/home')}
         activeOpacity={0.7}
       >
         <Text style={styles.emptyButtonText}>Başla</Text>

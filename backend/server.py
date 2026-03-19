@@ -1,9 +1,9 @@
 """
-AI Günlük Burç & Fal Uygulaması - Backend API
+Falyn - AI Günlük Burç & Fal Uygulaması - Backend API
 """
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr
 from typing import Optional, List
 from datetime import datetime, timedelta
 from bson import ObjectId
@@ -11,13 +11,14 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from dotenv import load_dotenv
 import os
 import uuid
+import re
 from emergentintegrations.llm.chat import LlmChat, UserMessage
 
 load_dotenv()
 
 # MongoDB Setup
 MONGO_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017")
-DB_NAME = os.getenv("DB_NAME", "burc_fal_db")
+DB_NAME = os.getenv("DB_NAME", "falyn_db")
 EMERGENT_LLM_KEY = os.getenv("EMERGENT_LLM_KEY")
 
 client = AsyncIOMotorClient(MONGO_URL)
@@ -25,7 +26,7 @@ db = client[DB_NAME]
 users_collection = db["users"]
 readings_collection = db["readings"]
 
-app = FastAPI(title="AI Günlük Burç & Fal API")
+app = FastAPI(title="Falyn - AI Günlük Burç & Fal API")
 
 # CORS
 app.add_middleware(
@@ -37,12 +38,19 @@ app.add_middleware(
 )
 
 # Pydantic Models
-class UserCreate(BaseModel):
+class UserRegister(BaseModel):
+    email: str
+    username: str
+    device_id: str
+
+class UserLogin(BaseModel):
+    email: str
     device_id: str
 
 class UserUpdate(BaseModel):
     zodiac_sign: Optional[str] = None
     preferred_tone: Optional[str] = None
+    notification_enabled: Optional[bool] = None
     notification_time: Optional[str] = None
 
 class ReadingRequest(BaseModel):
@@ -58,9 +66,12 @@ class ExpandReadingRequest(BaseModel):
 class UserResponse(BaseModel):
     id: str
     device_id: str
+    email: str
+    username: str
     zodiac_sign: Optional[str]
     preferred_tone: Optional[str]
-    notification_time: Optional[str]
+    notification_enabled: bool
+    notification_time: str
     free_readings_today: int
     last_reading_date: Optional[str]
 
@@ -83,12 +94,21 @@ def serialize_doc(doc) -> dict:
     if doc is None:
         return None
     doc["id"] = str(doc.pop("_id"))
+    if "last_reading_date" in doc and doc["last_reading_date"]:
+        doc["last_reading_date"] = doc["last_reading_date"].isoformat()
+    if "created_at" in doc and doc["created_at"]:
+        doc["created_at"] = doc["created_at"].isoformat()
     return doc
 
 def get_today_start():
     """Get the start of today in UTC"""
     now = datetime.utcnow()
     return datetime(now.year, now.month, now.day)
+
+def validate_email(email: str) -> bool:
+    """Simple email validation"""
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return re.match(pattern, email) is not None
 
 # Turkish translations for focus areas
 FOCUS_TRANSLATIONS = {
@@ -118,7 +138,7 @@ ZODIAC_TURKISH = {
     "pisces": "Balık"
 }
 
-async def generate_reading_content(focus: str, tone: str, zodiac_sign: Optional[str] = None, is_detailed: bool = False):
+async def generate_reading_content(focus: str, tone: str, zodiac_sign: Optional[str] = None, username: Optional[str] = None, is_detailed: bool = False):
     """Generate AI-powered horoscope reading"""
     
     focus_text = FOCUS_TRANSLATIONS.get(focus, "Genel Bakış")
@@ -129,7 +149,9 @@ async def generate_reading_content(focus: str, tone: str, zodiac_sign: Optional[
     
     word_count = "180-250" if is_detailed else "120-180"
     
-    system_message = """Sen deneyimli bir astroloji ve fal yorumcususun. Türkçe olarak kişiselleştirilmiş, dengeli ve pozitif burç/fal yorumları üretiyorsun.
+    name_part = f"Kullanıcının adı: {username}. Yorumda adını kullanabilirsin." if username else ""
+    
+    system_message = f"""Sen Falyn uygulamasının deneyimli astroloji ve fal yorumcususun. Türkçe olarak kişiselleştirilmiş, dengeli ve pozitif burç/fal yorumları üretiyorsun.
 
 KURALLAR (ÇOK ÖNEMLİ):
 - Asla korkutucu, negatif veya endişe verici içerik üretme
@@ -138,18 +160,19 @@ KURALLAR (ÇOK ÖNEMLİ):
 - Her zaman rehberlik hissi ver, yönlendir ama zorla değil
 - Umut verici ve destekleyici ol
 - Türkçe dilbilgisi kurallarına dikkat et, akıcı ve doğal yaz
+{name_part}
 
 TON:
 - "Daha Gerçekçi": Net, objektif, daha az duygusal ama yine pozitif
 - "Daha Motive Edici": Destekleyici, yumuşak, umut verici, cesaret veren
 
 ÇIKTI FORMATI (JSON):
-{
+{{
     "daily_energy": "Günün enerjisi hakkında 2-3 cümle",
     "focus_comment": "Seçilen odak alanına özel yorum, 3-4 cümle",
     "fortune_message": "Kısa ve etkileyici fal mesajı, 1-2 cümle",
     "daily_advice": "Günün tavsiyesi, pratik ve uygulanabilir, 2 cümle"
-}
+}}
 
 Sadece JSON formatında yanıt ver, başka bir şey ekleme."""
 
@@ -199,33 +222,33 @@ Lütfen bu parametrelere göre kişiselleştirilmiş bir günlük burç/fal yoru
 
 @app.get("/api/health")
 async def health_check():
-    return {"status": "healthy", "service": "AI Günlük Burç & Fal API"}
+    return {"status": "healthy", "service": "Falyn - AI Günlük Burç & Fal API"}
 
-@app.post("/api/users/register")
-async def register_user(user_data: UserCreate):
-    """Register or get existing user by device ID"""
-    existing_user = await users_collection.find_one({"device_id": user_data.device_id})
+@app.post("/api/auth/register")
+async def register_user(user_data: UserRegister):
+    """Register a new user with email and username"""
     
-    if existing_user:
-        # Check and reset daily readings if it's a new day
-        today_start = get_today_start()
-        last_reading = existing_user.get("last_reading_date")
-        
-        if last_reading and last_reading < today_start:
-            # Reset daily counter
-            await users_collection.update_one(
-                {"_id": existing_user["_id"]},
-                {"$set": {"free_readings_today": 0}}
-            )
-            existing_user["free_readings_today"] = 0
-        
-        return serialize_doc(existing_user)
+    # Validate email
+    if not validate_email(user_data.email):
+        raise HTTPException(status_code=400, detail="Geçersiz email formatı")
+    
+    # Check if email already exists
+    existing_email = await users_collection.find_one({"email": user_data.email.lower()})
+    if existing_email:
+        raise HTTPException(status_code=400, detail="Bu email adresi zaten kayıtlı")
+    
+    # Check username length
+    if len(user_data.username.strip()) < 2:
+        raise HTTPException(status_code=400, detail="Kullanıcı adı en az 2 karakter olmalı")
     
     # Create new user
     new_user = {
+        "email": user_data.email.lower(),
+        "username": user_data.username.strip(),
         "device_id": user_data.device_id,
         "zodiac_sign": None,
         "preferred_tone": "motivational",
+        "notification_enabled": True,
         "notification_time": "09:00",
         "free_readings_today": 0,
         "last_reading_date": None,
@@ -235,6 +258,63 @@ async def register_user(user_data: UserCreate):
     result = await users_collection.insert_one(new_user)
     new_user["_id"] = result.inserted_id
     return serialize_doc(new_user)
+
+@app.post("/api/auth/login")
+async def login_user(user_data: UserLogin):
+    """Login user with email"""
+    
+    user = await users_collection.find_one({"email": user_data.email.lower()})
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="Bu email ile kayıtlı kullanıcı bulunamadı")
+    
+    # Update device_id
+    await users_collection.update_one(
+        {"_id": user["_id"]},
+        {"$set": {"device_id": user_data.device_id}}
+    )
+    user["device_id"] = user_data.device_id
+    
+    # Check and reset daily readings if it's a new day
+    today_start = get_today_start()
+    last_reading = user.get("last_reading_date")
+    
+    if last_reading and last_reading < today_start:
+        await users_collection.update_one(
+            {"_id": user["_id"]},
+            {"$set": {"free_readings_today": 0}}
+        )
+        user["free_readings_today"] = 0
+    
+    return serialize_doc(user)
+
+@app.post("/api/auth/check")
+async def check_user(data: dict):
+    """Check if user exists by device_id or email"""
+    device_id = data.get("device_id")
+    email = data.get("email")
+    
+    user = None
+    if device_id:
+        user = await users_collection.find_one({"device_id": device_id})
+    if not user and email:
+        user = await users_collection.find_one({"email": email.lower()})
+    
+    if user:
+        # Check and reset daily readings if it's a new day
+        today_start = get_today_start()
+        last_reading = user.get("last_reading_date")
+        
+        if last_reading and last_reading < today_start:
+            await users_collection.update_one(
+                {"_id": user["_id"]},
+                {"$set": {"free_readings_today": 0}}
+            )
+            user["free_readings_today"] = 0
+        
+        return {"exists": True, "user": serialize_doc(user)}
+    
+    return {"exists": False, "user": None}
 
 @app.put("/api/users/{device_id}")
 async def update_user(device_id: str, user_data: UserUpdate):
@@ -301,21 +381,10 @@ async def check_daily_reading(device_id: str):
 async def generate_reading(request: ReadingRequest):
     """Generate a new horoscope reading"""
     
-    # Get or create user
+    # Get user
     user = await users_collection.find_one({"device_id": request.device_id})
     if not user:
-        # Auto-register user
-        user = {
-            "device_id": request.device_id,
-            "zodiac_sign": request.zodiac_sign,
-            "preferred_tone": request.tone,
-            "notification_time": "09:00",
-            "free_readings_today": 0,
-            "last_reading_date": None,
-            "created_at": datetime.utcnow()
-        }
-        result = await users_collection.insert_one(user)
-        user["_id"] = result.inserted_id
+        raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı. Lütfen önce giriş yapın.")
     
     # Check daily limit
     today_start = get_today_start()
@@ -337,6 +406,7 @@ async def generate_reading(request: ReadingRequest):
         focus=request.focus,
         tone=request.tone,
         zodiac_sign=request.zodiac_sign,
+        username=user.get("username"),
         is_detailed=False
     )
     
@@ -374,7 +444,6 @@ async def generate_reading(request: ReadingRequest):
     )
     
     serialized = serialize_doc(reading)
-    serialized["created_at"] = reading["created_at"].isoformat()
     serialized["is_free"] = is_free_reading
     
     return serialized
@@ -393,15 +462,18 @@ async def expand_reading(request: ExpandReadingRequest):
     
     if reading.get("is_expanded"):
         # Already expanded, return existing
-        serialized = serialize_doc(reading)
-        serialized["created_at"] = reading["created_at"].isoformat()
-        return serialized
+        return serialize_doc(reading)
+    
+    # Get user for username
+    user = await users_collection.find_one({"device_id": request.device_id})
+    username = user.get("username") if user else None
     
     # Generate detailed content
     detailed_content = await generate_reading_content(
         focus=reading["focus"],
         tone=reading["tone"],
         zodiac_sign=reading["zodiac_sign"],
+        username=username,
         is_detailed=True
     )
     
@@ -428,10 +500,7 @@ async def expand_reading(request: ExpandReadingRequest):
     reading["detailed_content"] = detailed_text
     reading["is_expanded"] = True
     
-    serialized = serialize_doc(reading)
-    serialized["created_at"] = reading["created_at"].isoformat()
-    
-    return serialized
+    return serialize_doc(reading)
 
 @app.get("/api/readings/history/{device_id}")
 async def get_reading_history(device_id: str, limit: int = 10):
@@ -443,9 +512,7 @@ async def get_reading_history(device_id: str, limit: int = 10):
     
     result = []
     for reading in readings:
-        serialized = serialize_doc(reading)
-        serialized["created_at"] = reading["created_at"].isoformat()
-        result.append(serialized)
+        result.append(serialize_doc(reading))
     
     return result
 
@@ -462,10 +529,18 @@ async def get_today_reading(device_id: str):
     if not reading:
         return {"has_reading": False, "reading": None}
     
-    serialized = serialize_doc(reading)
-    serialized["created_at"] = reading["created_at"].isoformat()
-    
-    return {"has_reading": True, "reading": serialized}
+    return {"has_reading": True, "reading": serialize_doc(reading)}
+
+# Legacy endpoint for backward compatibility
+@app.post("/api/users/register")
+async def legacy_register(data: dict):
+    """Legacy registration - redirect to check"""
+    device_id = data.get("device_id")
+    if device_id:
+        user = await users_collection.find_one({"device_id": device_id})
+        if user:
+            return serialize_doc(user)
+    return {"error": "Please use /api/auth/register or /api/auth/login"}
 
 if __name__ == "__main__":
     import uvicorn

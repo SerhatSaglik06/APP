@@ -42,7 +42,7 @@ export default function ResultScreen() {
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle" size={60} color="#a855f7" />
           <Text style={styles.errorText}>Yorum bulunamadı</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={() => router.replace('/')}>
+          <TouchableOpacity style={styles.retryButton} onPress={() => router.replace('/home')}>
             <Text style={styles.retryButtonText}>Ana Sayfaya Dön</Text>
           </TouchableOpacity>
         </View>
@@ -57,7 +57,7 @@ export default function ResultScreen() {
 
   const handleHome = () => {
     resetSelections();
-    router.replace('/');
+    router.replace('/home');
   };
 
   const simulateAd = (type: 'detail' | 'extra') => {
