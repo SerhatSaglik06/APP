@@ -50,7 +50,7 @@ export default function LoginScreen() {
       >
         <View style={styles.header}>
           <Ionicons name="nutrition" size={80} color="#4CAF50" />
-          <Text style={styles.title}>CalorieSnap</Text>
+          <Text style={styles.title}>Food AI Scanner</Text>
           <Text style={styles.subtitle}>Yemeğini Çek, Kalorisini Gör</Text>
         </View>
 

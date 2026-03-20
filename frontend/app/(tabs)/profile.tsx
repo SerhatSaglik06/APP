@@ -197,7 +197,7 @@ export default function ProfileScreen() {
           <Text style={styles.sectionTitle}>Uygulama Hakkında</Text>
           <View style={styles.aboutCard}>
             <Ionicons name="nutrition" size={40} color="#4CAF50" />
-            <Text style={styles.appName}>CalorieSnap</Text>
+            <Text style={styles.appName}>Food AI Scanner</Text>
             <Text style={styles.appVersion}>Versiyon 1.0.0</Text>
             <Text style={styles.appDescription}>
               Yemeğini çek, kalorisini gör! Sağlıklı yaşam için akıllı beslenme takip uygulaması.
