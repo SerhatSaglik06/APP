@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Text, View, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -24,14 +24,17 @@ const ZODIAC_SIGNS = [
 export default function ZodiacScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { setSelectedZodiac, selectedZodiac, generateReading, isLoading } = useAppStore();
+  const { setSelectedZodiac, selectedZodiac, generateReading } = useAppStore();
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const handleSelect = (zodiacId: string) => {
     setSelectedZodiac(zodiacId);
   };
 
   const handleContinue = async () => {
+    setIsGenerating(true);
     const reading = await generateReading();
+    setIsGenerating(false);
     if (reading) {
       router.push('/result');
     }
@@ -39,7 +42,9 @@ export default function ZodiacScreen() {
 
   const handleSkip = async () => {
     setSelectedZodiac(null);
+    setIsGenerating(true);
     const reading = await generateReading();
+    setIsGenerating(false);
     if (reading) {
       router.push('/result');
     }
@@ -96,7 +101,7 @@ export default function ZodiacScreen() {
           <TouchableOpacity
             style={styles.continueButton}
             onPress={handleContinue}
-            disabled={isLoading}
+            disabled={isGenerating}
             activeOpacity={0.8}
           >
             <LinearGradient
@@ -105,7 +110,7 @@ export default function ZodiacScreen() {
               end={{ x: 1, y: 0 }}
               style={styles.buttonGradient}
             >
-              {isLoading ? (
+              {isGenerating ? (
                 <Text style={styles.buttonText}>Yorum hazırlanıyor...</Text>
               ) : (
                 <>
@@ -119,10 +124,10 @@ export default function ZodiacScreen() {
           <TouchableOpacity
             style={styles.skipButton}
             onPress={handleSkip}
-            disabled={isLoading}
+            disabled={isGenerating}
             activeOpacity={0.7}
           >
-            {isLoading ? (
+            {isGenerating ? (
               <Text style={styles.skipButtonText}>Yorum hazırlanıyor...</Text>
             ) : (
               <Text style={styles.skipButtonText}>Burç seçmeden devam et</Text>
