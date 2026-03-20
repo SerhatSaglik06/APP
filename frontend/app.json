@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "ios": {
       "bundleIdentifier": "com.serhatsaglik.caloriesnap",
-      "buildNumber": "1",
+      "buildNumber": "2",
       "supportsTablet": true,
       "infoPlist": {
         "NSCameraUsageDescription": "Food AI Scanner uses your camera to photograph meals and analyze their nutritional content including calories, protein, and carbohydrates.",
