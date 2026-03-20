@@ -10,7 +10,7 @@ import sys
 from datetime import datetime
 
 # Use the backend URL from frontend .env
-BASE_URL = "https://calorie-snap-204.preview.emergentagent.com/api"
+BASE_URL = "https://calorie-snap-preview.preview.emergentagent.com/api"
 
 # Test data
 TEST_USER = {
