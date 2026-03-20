@@ -8,7 +8,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -25,6 +24,8 @@ export default function AuthScreen() {
   const [isRegister, setIsRegister] = useState(true);
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [localError, setLocalError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -49,6 +50,18 @@ export default function AuthScreen() {
       return;
     }
     
+    if (!password.trim()) {
+      setLocalError('Şifre gerekli');
+      setIsSubmitting(false);
+      return;
+    }
+    
+    if (password.length < 6) {
+      setLocalError('Şifre en az 6 karakter olmalı');
+      setIsSubmitting(false);
+      return;
+    }
+    
     if (isRegister) {
       if (!username.trim()) {
         setLocalError('Kullanıcı adı gerekli');
@@ -61,7 +74,7 @@ export default function AuthScreen() {
         return;
       }
       
-      const success = await register(email.trim(), username.trim());
+      const success = await register(email.trim(), username.trim(), password);
       setIsSubmitting(false);
       if (success) {
         // Schedule daily notification and send test
@@ -70,7 +83,7 @@ export default function AuthScreen() {
         router.replace('/home');
       }
     } else {
-      const success = await login(email.trim());
+      const success = await login(email.trim(), password);
       setIsSubmitting(false);
       if (success) {
         router.replace('/home');
@@ -141,6 +154,28 @@ export default function AuthScreen() {
               </View>
             )}
 
+            {/* Password Input */}
+            <View style={styles.inputContainer}>
+              <Ionicons name="lock-closed-outline" size={20} color="#8080a0" style={styles.inputIcon} />
+              <TextInput
+                style={styles.input}
+                placeholder="Şifren (en az 6 karakter)"
+                placeholderTextColor="#6060a0"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton}>
+                <Ionicons 
+                  name={showPassword ? "eye-off-outline" : "eye-outline"} 
+                  size={20} 
+                  color="#8080a0" 
+                />
+              </TouchableOpacity>
+            </View>
+
             {/* Error Message */}
             {(localError || error) && (
               <View style={styles.errorContainer}>
@@ -178,6 +213,7 @@ export default function AuthScreen() {
               onPress={() => {
                 setIsRegister(!isRegister);
                 setLocalError('');
+                setPassword('');
               }}
             >
               <Text style={styles.toggleText}>
@@ -226,7 +262,7 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: 30,
   },
   title: {
     fontSize: 42,
@@ -276,6 +312,9 @@ const styles = StyleSheet.create({
     height: 54,
     color: '#fff',
     fontSize: 16,
+  },
+  eyeButton: {
+    padding: 8,
   },
   errorContainer: {
     flexDirection: 'row',

@@ -9,12 +9,22 @@ from datetime import datetime, timedelta
 from bson import ObjectId
 from motor.motor_asyncio import AsyncIOMotorClient
 from dotenv import load_dotenv
+from passlib.context import CryptContext
 import os
 import uuid
 import re
 from emergentintegrations.llm.chat import LlmChat, UserMessage
 
 load_dotenv()
+
+# Password hashing
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
 
 # MongoDB Setup
 MONGO_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017")
@@ -41,10 +51,12 @@ app.add_middleware(
 class UserRegister(BaseModel):
     email: str
     username: str
+    password: str
     device_id: str
 
 class UserLogin(BaseModel):
     email: str
+    password: str
     device_id: str
 
 class UserUpdate(BaseModel):
@@ -226,7 +238,7 @@ async def health_check():
 
 @app.post("/api/auth/register")
 async def register_user(user_data: UserRegister):
-    """Register a new user with email and username"""
+    """Register a new user with email, username and password"""
     
     # Validate email
     if not validate_email(user_data.email):
@@ -241,10 +253,15 @@ async def register_user(user_data: UserRegister):
     if len(user_data.username.strip()) < 2:
         raise HTTPException(status_code=400, detail="Kullanıcı adı en az 2 karakter olmalı")
     
-    # Create new user
+    # Check password length
+    if len(user_data.password) < 6:
+        raise HTTPException(status_code=400, detail="Şifre en az 6 karakter olmalı")
+    
+    # Create new user with hashed password
     new_user = {
         "email": user_data.email.lower(),
         "username": user_data.username.strip(),
+        "password_hash": hash_password(user_data.password),
         "device_id": user_data.device_id,
         "zodiac_sign": None,
         "preferred_tone": "motivational",
@@ -257,16 +274,22 @@ async def register_user(user_data: UserRegister):
     
     result = await users_collection.insert_one(new_user)
     new_user["_id"] = result.inserted_id
+    # Don't return password hash
+    del new_user["password_hash"]
     return serialize_doc(new_user)
 
 @app.post("/api/auth/login")
 async def login_user(user_data: UserLogin):
-    """Login user with email"""
+    """Login user with email and password"""
     
     user = await users_collection.find_one({"email": user_data.email.lower()})
     
     if not user:
         raise HTTPException(status_code=404, detail="Bu email ile kayıtlı kullanıcı bulunamadı")
+    
+    # Verify password
+    if not user.get("password_hash") or not verify_password(user_data.password, user["password_hash"]):
+        raise HTTPException(status_code=401, detail="Şifre yanlış")
     
     # Update device_id
     await users_collection.update_one(
@@ -285,6 +308,10 @@ async def login_user(user_data: UserLogin):
             {"$set": {"free_readings_today": 0}}
         )
         user["free_readings_today"] = 0
+    
+    # Don't return password hash
+    if "password_hash" in user:
+        del user["password_hash"]
     
     return serialize_doc(user)
 

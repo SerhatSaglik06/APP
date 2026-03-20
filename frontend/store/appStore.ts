@@ -60,8 +60,8 @@ interface AppState {
   
   // API Actions
   checkExistingUser: (deviceId: string) => Promise<User | null>;
-  register: (email: string, username: string) => Promise<boolean>;
-  login: (email: string) => Promise<boolean>;
+  register: (email: string, username: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<boolean>;
   logout: () => Promise<void>;
   checkDailyReading: () => Promise<void>;
   generateReading: () => Promise<Reading | null>;
@@ -127,7 +127,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   
   // Register new user
-  register: async (email, username) => {
+  register: async (email, username, password) => {
     const { deviceId } = get();
     if (!deviceId) return false;
     
@@ -140,6 +140,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         body: JSON.stringify({ 
           email, 
           username, 
+          password,
           device_id: deviceId 
         }),
       });
@@ -167,7 +168,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
   
   // Login user
-  login: async (email) => {
+  login: async (email, password) => {
     const { deviceId } = get();
     if (!deviceId) return false;
     
@@ -177,7 +178,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const response = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, device_id: deviceId }),
+        body: JSON.stringify({ email, password, device_id: deviceId }),
       });
       
       if (response.ok) {

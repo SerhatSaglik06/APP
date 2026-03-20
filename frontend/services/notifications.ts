@@ -76,38 +76,46 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
 }
 
 export async function scheduleDailyNotification(hour: number = 9, minute: number = 0): Promise<void> {
-  // Cancel all existing scheduled notifications first
-  await Notifications.cancelAllScheduledNotificationsAsync();
-  
-  // Get a random message
-  const randomMessage = NOTIFICATION_MESSAGES[Math.floor(Math.random() * NOTIFICATION_MESSAGES.length)];
-  
-  // Schedule daily notification at specified time
-  await Notifications.scheduleNotificationAsync({
-    content: {
-      title: randomMessage.title,
-      body: randomMessage.body,
-      data: { screen: 'home' },
-      sound: true,
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DAILY,
-      hour: hour,
-      minute: minute,
-    },
-  });
-  
-  // Save notification settings
-  await AsyncStorage.setItem('notification_time', `${hour}:${minute}`);
-  await AsyncStorage.setItem('notifications_enabled', 'true');
-  
-  console.log(`Daily notification scheduled for ${hour}:${minute.toString().padStart(2, '0')}`);
+  try {
+    // Cancel all existing scheduled notifications first
+    await Notifications.cancelAllScheduledNotificationsAsync();
+    
+    // Get a random message
+    const randomMessage = NOTIFICATION_MESSAGES[Math.floor(Math.random() * NOTIFICATION_MESSAGES.length)];
+    
+    // Schedule daily notification at specified time
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: randomMessage.title,
+        body: randomMessage.body,
+        data: { screen: 'home' },
+        sound: true,
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DAILY,
+        hour: hour,
+        minute: minute,
+      },
+    });
+    
+    // Save notification settings
+    await AsyncStorage.setItem('notification_time', `${hour}:${minute}`);
+    await AsyncStorage.setItem('notifications_enabled', 'true');
+    
+    console.log(`Daily notification scheduled for ${hour}:${minute.toString().padStart(2, '0')}`);
+  } catch (error) {
+    console.log('Error scheduling notification:', error);
+  }
 }
 
 export async function cancelAllNotifications(): Promise<void> {
-  await Notifications.cancelAllScheduledNotificationsAsync();
-  await AsyncStorage.setItem('notifications_enabled', 'false');
-  console.log('All notifications cancelled');
+  try {
+    await Notifications.cancelAllScheduledNotificationsAsync();
+    await AsyncStorage.setItem('notifications_enabled', 'false');
+    console.log('All notifications cancelled');
+  } catch (error) {
+    console.log('Error cancelling notifications:', error);
+  }
 }
 
 export async function checkNotificationStatus(): Promise<{
@@ -124,12 +132,19 @@ export async function checkNotificationStatus(): Promise<{
 }
 
 export async function sendTestNotification(): Promise<void> {
-  await Notifications.scheduleNotificationAsync({
-    content: {
-      title: '🔮 Falyn Test Bildirimi',
-      body: 'Bildirimler başarıyla ayarlandı! Her sabah 09:00\'da günlük yorumun için hatırlatma alacaksın.',
-      data: { screen: 'home' },
-    },
-    trigger: { seconds: 2 },
-  });
+  try {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: '🔮 Falyn Test Bildirimi',
+        body: 'Bildirimler başarıyla ayarlandı! Her sabah 09:00\'da günlük yorumun için hatırlatma alacaksın.',
+        data: { screen: 'home' },
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: 2,
+      },
+    });
+  } catch (error) {
+    console.log('Error sending test notification:', error);
+  }
 }
