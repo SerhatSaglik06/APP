@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "CalorieSnap",
+    "name": "Food AI Scanner",
     "slug": "caloriesnap",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -13,8 +13,8 @@
       "buildNumber": "1",
       "supportsTablet": true,
       "infoPlist": {
-        "NSCameraUsageDescription": "Scan food to track calories",
-        "NSPhotoLibraryUsageDescription": "Choose food photos from gallery"
+        "NSCameraUsageDescription": "Food AI Scanner uses your camera to photograph meals and analyze their nutritional content including calories, protein, and carbohydrates.",
+        "NSPhotoLibraryUsageDescription": "Food AI Scanner needs access to your photo library to select existing meal photos for nutritional analysis."
       }
     },
     "android": {

@@ -23,6 +23,7 @@ export default function ProfileScreen() {
   const [editingGoal, setEditingGoal] = useState(false);
   const [newGoal, setNewGoal] = useState(user?.daily_calorie_goal.toString() || '2000');
   const [loading, setLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const handleUpdateGoal = async () => {
     const goalValue = parseInt(newGoal);
@@ -61,6 +62,48 @@ export default function ProfileScreen() {
         },
       },
     ]);
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Hesabı Sil',
+      'Hesabınızı silmek istediğinize emin misiniz? Bu işlem geri alınamaz ve tüm verileriniz (yemek kayıtları, istatistikler) kalıcı olarak silinecektir.',
+      [
+        { text: 'İptal', style: 'cancel' },
+        {
+          text: 'Evet, Hesabımı Sil',
+          style: 'destructive',
+          onPress: () => confirmDeleteAccount(),
+        },
+      ]
+    );
+  };
+
+  const confirmDeleteAccount = async () => {
+    setDeleteLoading(true);
+    try {
+      await axios.delete(`${BACKEND_URL}/api/user/delete`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      
+      Alert.alert(
+        'Hesap Silindi',
+        'Hesabınız ve tüm verileriniz başarıyla silindi.',
+        [
+          {
+            text: 'Tamam',
+            onPress: async () => {
+              await logout();
+              router.replace('/(auth)/login');
+            },
+          },
+        ]
+      );
+    } catch (error: any) {
+      Alert.alert('Hata', error.response?.data?.detail || 'Hesap silinemedi. Lütfen tekrar deneyin.');
+    } finally {
+      setDeleteLoading(false);
+    }
   };
 
   return (
@@ -166,6 +209,27 @@ export default function ProfileScreen() {
           <Ionicons name="log-out" size={24} color="#fff" />
           <Text style={styles.logoutButtonText}>Çıkış Yap</Text>
         </TouchableOpacity>
+
+        <View style={styles.dangerSection}>
+          <Text style={styles.dangerSectionTitle}>Tehlikeli Bölge</Text>
+          <TouchableOpacity 
+            style={[styles.deleteButton, deleteLoading && styles.buttonDisabled]} 
+            onPress={handleDeleteAccount}
+            disabled={deleteLoading}
+          >
+            {deleteLoading ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <>
+                <Ionicons name="trash" size={24} color="#fff" />
+                <Text style={styles.deleteButtonText}>Hesabı Sil</Text>
+              </>
+            )}
+          </TouchableOpacity>
+          <Text style={styles.deleteWarning}>
+            Bu işlem geri alınamaz. Tüm verileriniz kalıcı olarak silinecektir.
+          </Text>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -354,5 +418,36 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginLeft: 12,
+  },
+  dangerSection: {
+    marginTop: 24,
+    marginBottom: 40,
+  },
+  dangerSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FF3B30',
+    marginBottom: 12,
+  },
+  deleteButton: {
+    backgroundColor: '#FF3B30',
+    borderRadius: 16,
+    padding: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginLeft: 12,
+  },
+  deleteWarning: {
+    fontSize: 13,
+    color: '#999',
+    textAlign: 'center',
+    marginTop: 12,
+    lineHeight: 18,
   },
 });
