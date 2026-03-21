@@ -14,7 +14,7 @@ import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppStore } from '../store/appStore';
-import { scheduleDailyNotification, sendTestNotification } from '../services/notifications';
+import { scheduleDailyNotification, sendTestNotification, registerForPushNotificationsAsync } from '../services/notifications';
 
 export default function AuthScreen() {
   const router = useRouter();
@@ -77,6 +77,8 @@ export default function AuthScreen() {
       const success = await register(email.trim(), username.trim(), password);
       setIsSubmitting(false);
       if (success) {
+        // Request notification permission first (iOS will show popup)
+        await registerForPushNotificationsAsync();
         // Schedule daily notification and send test
         await scheduleDailyNotification(9, 0);
         await sendTestNotification();
@@ -86,6 +88,8 @@ export default function AuthScreen() {
       const success = await login(email.trim(), password);
       setIsSubmitting(false);
       if (success) {
+        // Request notification permission on login too (in case not granted before)
+        await registerForPushNotificationsAsync();
         router.replace('/home');
       }
     }
