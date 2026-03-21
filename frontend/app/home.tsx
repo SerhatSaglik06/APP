@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Text, View, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { Text, View, StyleSheet, TouchableOpacity, Dimensions, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -59,14 +59,17 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Moon Icon */}
-      <View style={styles.moonContainer}>
-        <Ionicons name="moon" size={80} color="#f0d060" />
+      {/* Logo Image */}
+      <View style={styles.logoContainer}>
+        <Image 
+          source={require('../assets/images/icon.png')} 
+          style={styles.logoImage}
+          resizeMode="contain"
+        />
       </View>
 
       {/* Title */}
       <View style={styles.titleContainer}>
-        <Text style={styles.title}>Falyn</Text>
         <Text style={styles.subtitle}>Günlük Burç & Fal</Text>
       </View>
 
@@ -156,26 +159,25 @@ const styles = StyleSheet.create({
   settingsButton: {
     padding: 8,
   },
-  moonContainer: {
+  logoContainer: {
     alignItems: 'center',
-    marginTop: 20,
-    marginBottom: 16,
+    marginTop: 10,
+    marginBottom: 10,
+  },
+  logoImage: {
+    width: 150,
+    height: 150,
+    borderRadius: 75,
   },
   titleContainer: {
     alignItems: 'center',
     marginBottom: 30,
   },
-  title: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    color: '#fff',
-    textAlign: 'center',
-  },
   subtitle: {
-    fontSize: 16,
-    color: '#a0a0c0',
+    fontSize: 22,
+    fontWeight: '600',
+    color: '#e0e0ff',
     textAlign: 'center',
-    marginTop: 4,
   },
   contentContainer: {
     alignItems: 'center',
