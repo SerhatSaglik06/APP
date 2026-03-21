@@ -317,7 +317,7 @@ async def login_user(user_data: UserLogin):
 
 @app.post("/api/auth/check")
 async def check_user(data: dict):
-    """Check if user exists by device_id or email"""
+    """Check if user exists by device_id or email - only returns existing if user has password"""
     device_id = data.get("device_id")
     email = data.get("email")
     
@@ -328,6 +328,11 @@ async def check_user(data: dict):
         user = await users_collection.find_one({"email": email.lower()})
     
     if user:
+        # Only consider user as existing if they have a password set
+        if not user.get("password_hash"):
+            # User exists but has no password - need to re-register
+            return {"exists": False, "user": None, "needs_password": True}
+        
         # Check and reset daily readings if it's a new day
         today_start = get_today_start()
         last_reading = user.get("last_reading_date")
@@ -338,6 +343,10 @@ async def check_user(data: dict):
                 {"$set": {"free_readings_today": 0}}
             )
             user["free_readings_today"] = 0
+        
+        # Don't return password hash
+        if "password_hash" in user:
+            del user["password_hash"]
         
         return {"exists": True, "user": serialize_doc(user)}
     
