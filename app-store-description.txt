@@ -1,0 +1,36 @@
+🍎 CALORIESNAP - AKILLI KALORİ TAKİP
+
+Yemeğinizin fotoğrafını çekin, yapay zeka anında kalori hesaplasın!
+
+✨ ÖZELLİKLER:
+
+📸 ANINDA ANALİZ
+• Kamera veya galeriden fotoğraf
+• GPT-4 Vision AI ile otomatik tanıma
+• Saniyeler içinde besin değerleri
+
+📊 GÜNLÜK TAKİP
+• Günlük kalori hedefi
+• Anlık ilerleme
+• Protein ve karbonhidrat
+
+📅 İSTATİSTİKLER
+• Öğün geçmişi
+• Haftalık/aylık raporlar
+• Görsel grafikler
+
+🎯 KİMLER İÇİN?
+✓ Diyet yapanlar
+✓ Sporcular
+✓ Sağlıklı yaşam isteyenler
+
+💪 NEDEN CALORIESNAP?
+• Hızlı ve kolay
+• AI destekli
+• Türkçe arayüz
+• Manuel girişe gerek yok
+
+Sağlıklı yaşam burada başlıyor!
+
+İletişim: saglik06@gmail.com
+Gizlilik: https://serhatsaglik06.github.io/APP/privacy-policy.html
