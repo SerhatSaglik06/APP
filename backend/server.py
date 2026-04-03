@@ -20,9 +20,9 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
 # MongoDB connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ.get('DB_NAME', 'food_tracker_db')]
+mongo_url = os.environ.get('MONGO_URL', '')
+db_client = AsyncIOMotorClient(mongo_url)
+db = db_client[os.environ.get('DB_NAME', 'food_tracker_db')]
 
 # Security
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -33,7 +33,9 @@ JWT_EXPIRATION_HOURS = int(os.environ.get('JWT_EXPIRATION_HOURS', 168))
 
 # OpenAI API Key
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
-openai_client = AsyncOpenAI(api_key=OPENAI_API_KEY)
+
+def get_openai_client():
+    return AsyncOpenAI(api_key=OPENAI_API_KEY)
 
 # Logging
 logging.basicConfig(
@@ -225,7 +227,6 @@ async def update_goal(goal_data: UpdateGoal, current_user: dict = Depends(get_cu
 
 @api_router.delete("/user/delete")
 async def delete_account(current_user: dict = Depends(get_current_user)):
-    """Delete user account and all associated data - Required by Apple App Store"""
     user_id = current_user["_id"]
     await db.meals.delete_many({"user_id": user_id})
     result = await db.users.delete_one({"_id": user_id})
@@ -240,6 +241,7 @@ async def delete_account(current_user: dict = Depends(get_current_user)):
 @api_router.post("/meals/analyze", response_model=MealResponse)
 async def analyze_meal(meal_data: MealAnalyzeRequest, current_user: dict = Depends(get_current_user)):
     try:
+        openai_client = get_openai_client()
         response = await openai_client.chat.completions.create(
             model="gpt-4o",
             messages=[
@@ -434,4 +436,4 @@ app.add_middleware(
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
-    client.close()
+    db_client.close()
