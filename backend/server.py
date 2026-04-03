@@ -219,6 +219,25 @@ async def update_goal(goal_data: UpdateGoal, current_user: dict = Depends(get_cu
         created_at=updated_user["created_at"]
     )
 
+@api_router.delete("/user/delete")
+async def delete_account(current_user: dict = Depends(get_current_user)):
+    """
+    Delete user account and all associated data (meals).
+    This is required by Apple App Store guidelines for account deletion.
+    """
+    user_id = current_user["_id"]
+    
+    # Delete all user's meals
+    await db.meals.delete_many({"user_id": user_id})
+    
+    # Delete user account
+    result = await db.users.delete_one({"_id": user_id})
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return {"message": "Account successfully deleted", "deleted": True}
+
 # ==================== MEAL ANALYSIS ====================
 
 @api_router.post("/meals/analyze", response_model=MealResponse)

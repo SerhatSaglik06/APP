@@ -8,6 +8,7 @@ import {
   Alert,
   ScrollView,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,6 +24,8 @@ export default function ProfileScreen() {
   const [editingGoal, setEditingGoal] = useState(false);
   const [newGoal, setNewGoal] = useState(user?.daily_calorie_goal.toString() || '2000');
   const [loading, setLoading] = useState(false);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const handleUpdateGoal = async () => {
     const goalValue = parseInt(newGoal);
@@ -61,6 +64,34 @@ export default function ProfileScreen() {
         },
       },
     ]);
+  };
+
+  const handleDeleteAccount = async () => {
+    setDeleting(true);
+    try {
+      await axios.delete(`${BACKEND_URL}/api/user/delete`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      setDeleteModalVisible(false);
+      Alert.alert(
+        'Hesap Silindi',
+        'Hesabınız ve tüm verileriniz başarıyla silindi.',
+        [
+          {
+            text: 'Tamam',
+            onPress: async () => {
+              await logout();
+              router.replace('/(auth)/login');
+            }
+          }
+        ]
+      );
+    } catch (error: any) {
+      Alert.alert('Hata', error.response?.data?.detail || 'Hesap silinemedi. Lütfen tekrar deneyin.');
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -154,7 +185,7 @@ export default function ProfileScreen() {
           <Text style={styles.sectionTitle}>Uygulama Hakkında</Text>
           <View style={styles.aboutCard}>
             <Ionicons name="nutrition" size={40} color="#4CAF50" />
-            <Text style={styles.appName}>CalorieSnap</Text>
+            <Text style={styles.appName}>Food AI Scanner</Text>
             <Text style={styles.appVersion}>Versiyon 1.0.0</Text>
             <Text style={styles.appDescription}>
               Yemeğini çek, kalorisini gör! Sağlıklı yaşam için akıllı beslenme takip uygulaması.
@@ -166,7 +197,58 @@ export default function ProfileScreen() {
           <Ionicons name="log-out" size={24} color="#fff" />
           <Text style={styles.logoutButtonText}>Çıkış Yap</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.deleteAccountButton} 
+          onPress={() => setDeleteModalVisible(true)}
+        >
+          <Ionicons name="trash" size={24} color="#fff" />
+          <Text style={styles.deleteAccountButtonText}>Hesabı Sil</Text>
+        </TouchableOpacity>
       </ScrollView>
+
+      {/* Delete Account Confirmation Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={deleteModalVisible}
+        onRequestClose={() => setDeleteModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalIconContainer}>
+              <Ionicons name="warning" size={48} color="#FF3B30" />
+            </View>
+            <Text style={styles.modalTitle}>Hesabı Sil</Text>
+            <Text style={styles.modalDescription}>
+              Bu işlem geri alınamaz. Hesabınız ve tüm yemek geçmişiniz kalıcı olarak silinecektir.
+            </Text>
+            <Text style={styles.modalWarning}>
+              Devam etmek istediğinizden emin misiniz?
+            </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={() => setDeleteModalVisible(false)}
+                disabled={deleting}
+              >
+                <Text style={styles.modalCancelButtonText}>İptal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalDeleteButton, deleting && styles.buttonDisabled]}
+                onPress={handleDeleteAccount}
+                disabled={deleting}
+              >
+                {deleting ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.modalDeleteButtonText}>Evet, Sil</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -354,5 +436,95 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginLeft: 12,
+  },
+  deleteAccountButton: {
+    backgroundColor: '#8E8E93',
+    borderRadius: 16,
+    padding: 18,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12,
+    marginBottom: 40,
+  },
+  deleteAccountButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginLeft: 12,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 24,
+    width: '100%',
+    maxWidth: 340,
+    alignItems: 'center',
+  },
+  modalIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#FFEBEE',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 12,
+  },
+  modalDescription: {
+    fontSize: 15,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 8,
+  },
+  modalWarning: {
+    fontSize: 15,
+    color: '#FF3B30',
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    width: '100%',
+  },
+  modalCancelButton: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 12,
+    padding: 14,
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  modalCancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666',
+  },
+  modalDeleteButton: {
+    flex: 1,
+    backgroundColor: '#FF3B30',
+    borderRadius: 12,
+    padding: 14,
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  modalDeleteButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
   },
 });

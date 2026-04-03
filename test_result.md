@@ -240,6 +240,35 @@ test_plan:
   test_all: false
   test_priority: "high_first"
 
+  - task: "Apple App Store Review Auth Flow"
+    implemented: true
+    working: true
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "testing"
+        comment: "Apple App Store review auth flow tested successfully - User registration (POST /api/auth/register), login (POST /api/auth/login), account deletion (DELETE /api/user/delete), and verification of deletion all working correctly. Used test credentials reviewer@test.com with password TestReview123!. Account deletion returns proper response: {'message': 'Account successfully deleted', 'deleted': True} and subsequent login attempts correctly fail with 401."
+
+frontend:
+
+metadata:
+  created_by: "testing_agent"
+  version: "1.0"
+  test_sequence: 2
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "Apple App Store Review Auth Flow completed"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
 agent_communication:
   - agent: "testing"
     message: "Completed comprehensive backend API testing for Food Tracker. All 9 testable endpoints passed successfully. Authentication flow works correctly, user management is functional, and all statistics/summary endpoints return proper data structures. The meal analysis endpoint was not tested per instructions as it requires OpenAI integration and image data. Backend is ready for production use."
+  - agent: "testing"
+    message: "Completed Apple App Store review auth flow testing. All 4 test scenarios passed: 1) User registration with reviewer@test.com creates account and returns JWT token, 2) User login authenticates successfully, 3) Account deletion (DELETE /api/user/delete) returns correct response format, 4) Login after deletion correctly fails with 401. Auth flow meets Apple App Store requirements for account deletion functionality."
