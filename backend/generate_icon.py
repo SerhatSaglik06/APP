@@ -12,9 +12,9 @@ load_dotenv(ROOT_DIR / '.env')
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
 
 async def generate_app_icon():
-    """Generate CalorieSnap app icon with green apple and measuring tape"""
+    """Generate Food AI Scanner app icon with green apple and measuring tape"""
     
-    print("🎨 Generating CalorieSnap app icon...")
+    print("🎨 Generating Food AI Scanner app icon...")
     
     # Initialize image generator
     image_gen = OpenAIImageGeneration(api_key=OPENAI_API_KEY)
@@ -73,6 +73,6 @@ async def generate_app_icon():
 if __name__ == "__main__":
     success = asyncio.run(generate_app_icon())
     if success:
-        print("\n✨ CalorieSnap icon is ready!")
+        print("\n✨ Food AI Scanner icon is ready!")
     else:
         print("\n⚠️ Icon generation failed")
