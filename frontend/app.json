@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "CalorieSnap",
+    "name": "Food AI Scanner",
     "slug": "caloriesnap",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -10,15 +10,16 @@
     "newArchEnabled": true,
     "ios": {
       "bundleIdentifier": "com.serhatsaglik.caloriesnap",
-      "buildNumber": "1",
+      "buildNumber": "2",
       "supportsTablet": true,
       "infoPlist": {
-        "NSCameraUsageDescription": "Scan food to track calories",
-        "NSPhotoLibraryUsageDescription": "Choose food photos from gallery",
+        "NSCameraUsageDescription": "Food AI Scanner needs camera access to capture photos of your meals. The app will analyze these food images using AI to provide you with nutritional information including calories, protein, and carbohydrates. For example, take a photo of your breakfast to instantly see its nutritional values.",
+        "NSPhotoLibraryUsageDescription": "Food AI Scanner needs access to your photo library so you can select existing food photos for nutritional analysis. The app will analyze selected images using AI to provide calories, protein, and carbohydrate information. For example, select a photo of your dinner to see its nutritional breakdown.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
+      "package": "com.serhatsaglik.caloriesnap",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#000"
@@ -36,16 +37,7 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      "expo-router",
-      [
-        "expo-splash-screen",
-        {
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200,
-          "resizeMode": "contain",
-          "backgroundColor": "#000"
-        }
-      ]
+      "expo-router"
     ],
     "experiments": {
       "typedRoutes": true
