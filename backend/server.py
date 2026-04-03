@@ -12,7 +12,7 @@ import uuid
 from datetime import datetime, timedelta
 from passlib.context import CryptContext
 from jose import JWTError, jwt
-from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+from openai import AsyncOpenAI
 import base64
 import json
 
@@ -33,6 +33,14 @@ JWT_EXPIRATION_HOURS = int(os.environ.get('JWT_EXPIRATION_HOURS', 168))
 
 # OpenAI API Key
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
+openai_client = AsyncOpenAI(api_key=OPENAI_API_KEY)
+
+# Logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
@@ -126,7 +134,6 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 
 @api_router.post("/auth/register", response_model=TokenResponse)
 async def register(user_data: UserRegister):
-    # Check if user exists
     existing_user = await db.users.find_one({"email": user_data.email})
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -135,7 +142,6 @@ async def register(user_data: UserRegister):
     if existing_username:
         raise HTTPException(status_code=400, detail="Username already taken")
     
-    # Create user
     user_id = str(uuid.uuid4())
     user_dict = {
         "_id": user_id,
@@ -147,8 +153,6 @@ async def register(user_data: UserRegister):
     }
     
     await db.users.insert_one(user_dict)
-    
-    # Create token
     access_token = create_access_token(data={"sub": user_id})
     
     user_response = UserResponse(
@@ -219,40 +223,59 @@ async def update_goal(goal_data: UpdateGoal, current_user: dict = Depends(get_cu
         created_at=updated_user["created_at"]
     )
 
+@api_router.delete("/user/delete")
+async def delete_account(current_user: dict = Depends(get_current_user)):
+    """Delete user account and all associated data - Required by Apple App Store"""
+    user_id = current_user["_id"]
+    await db.meals.delete_many({"user_id": user_id})
+    result = await db.users.delete_one({"_id": user_id})
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    return {"message": "Account successfully deleted", "deleted": True}
+
 # ==================== MEAL ANALYSIS ====================
 
 @api_router.post("/meals/analyze", response_model=MealResponse)
 async def analyze_meal(meal_data: MealAnalyzeRequest, current_user: dict = Depends(get_current_user)):
     try:
-        # Initialize OpenAI chat
-        chat = LlmChat(
-            api_key=OPENAI_API_KEY,
-            session_id=f"meal_analysis_{uuid.uuid4()}",
-            system_message="You are a nutrition expert. Analyze food images and provide accurate nutritional information in JSON format only."
-        ).with_model("openai", "gpt-4o")
-        
-        # Create message with image
-        image_content = ImageContent(image_base64=meal_data.image_base64)
-        
-        user_message = UserMessage(
-            text="""Analyze this food image and provide nutritional information in the following JSON format ONLY (no extra text):
+        response = await openai_client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a nutrition expert. Analyze food images and provide accurate nutritional information in JSON format only."
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": """Analyze this food image and provide nutritional information in the following JSON format ONLY (no extra text):
 {
   "food_name": "name of the food",
   "calories": estimated calories (number),
   "protein": estimated protein in grams (number),
   "carbs": estimated carbohydrates in grams (number)
 }
-Be as accurate as possible based on typical serving sizes.""",
-            file_contents=[image_content]
+Be as accurate as possible based on typical serving sizes."""
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{meal_data.image_base64}"
+                            }
+                        }
+                    ]
+                }
+            ],
+            max_tokens=500
         )
         
-        # Get response from OpenAI
-        response = await chat.send_message(user_message)
+        response_text = response.choices[0].message.content.strip()
         
-        # Parse JSON response
         try:
-            # Try to extract JSON from response
-            response_text = response.strip()
             if "```json" in response_text:
                 response_text = response_text.split("```json")[1].split("```")[0].strip()
             elif "```" in response_text:
@@ -260,10 +283,8 @@ Be as accurate as possible based on typical serving sizes.""",
             
             nutrition_data = json.loads(response_text)
         except:
-            # Fallback parsing
             raise HTTPException(status_code=500, detail="Failed to parse nutrition data from AI response")
         
-        # Store meal in database
         meal_id = str(uuid.uuid4())
         meal_dict = {
             "_id": meal_id,
@@ -301,7 +322,6 @@ Be as accurate as possible based on typical serving sizes.""",
 
 @api_router.get("/meals/today", response_model=DailySummary)
 async def get_today_meals(current_user: dict = Depends(get_current_user)):
-    # Get today's start and end
     today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     today_end = today_start + timedelta(days=1)
     
@@ -347,7 +367,6 @@ async def get_meal_history(limit: int = 50, current_user: dict = Depends(get_cur
 
 @api_router.get("/stats/weekly", response_model=WeeklyStats)
 async def get_weekly_stats(current_user: dict = Depends(get_current_user)):
-    # Get last 7 days
     week_start = datetime.utcnow() - timedelta(days=7)
     
     meals = await db.meals.find({
@@ -356,19 +375,11 @@ async def get_weekly_stats(current_user: dict = Depends(get_current_user)):
     }).to_list(1000)
     
     if not meals:
-        return WeeklyStats(
-            avg_calories=0,
-            avg_protein=0,
-            avg_carbs=0,
-            total_meals=0,
-            days_tracked=0
-        )
+        return WeeklyStats(avg_calories=0, avg_protein=0, avg_carbs=0, total_meals=0, days_tracked=0)
     
     total_calories = sum(meal.get("calories", 0) for meal in meals)
     total_protein = sum(meal.get("protein", 0) for meal in meals)
     total_carbs = sum(meal.get("carbs", 0) for meal in meals)
-    
-    # Count unique days
     unique_days = len(set(meal["timestamp"].date() for meal in meals))
     
     return WeeklyStats(
@@ -381,7 +392,6 @@ async def get_weekly_stats(current_user: dict = Depends(get_current_user)):
 
 @api_router.get("/stats/monthly", response_model=WeeklyStats)
 async def get_monthly_stats(current_user: dict = Depends(get_current_user)):
-    # Get last 30 days
     month_start = datetime.utcnow() - timedelta(days=30)
     
     meals = await db.meals.find({
@@ -390,18 +400,11 @@ async def get_monthly_stats(current_user: dict = Depends(get_current_user)):
     }).to_list(1000)
     
     if not meals:
-        return WeeklyStats(
-            avg_calories=0,
-            avg_protein=0,
-            avg_carbs=0,
-            total_meals=0,
-            days_tracked=0
-        )
+        return WeeklyStats(avg_calories=0, avg_protein=0, avg_carbs=0, total_meals=0, days_tracked=0)
     
     total_calories = sum(meal.get("calories", 0) for meal in meals)
     total_protein = sum(meal.get("protein", 0) for meal in meals)
     total_carbs = sum(meal.get("carbs", 0) for meal in meals)
-    
     unique_days = len(set(meal["timestamp"].date() for meal in meals))
     
     return WeeklyStats(
@@ -428,12 +431,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
