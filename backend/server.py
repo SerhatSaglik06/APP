@@ -12,7 +12,7 @@ import uuid
 from datetime import datetime, timedelta
 from passlib.context import CryptContext
 from jose import JWTError, jwt
-from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+from openai import AsyncOpenAI
 import base64
 import json
 
@@ -33,6 +33,7 @@ JWT_EXPIRATION_HOURS = int(os.environ.get('JWT_EXPIRATION_HOURS', 168))
 
 # OpenAI API Key
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
+openai_client = AsyncOpenAI(api_key=OPENAI_API_KEY)
 
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
@@ -243,35 +244,44 @@ async def delete_account(current_user: dict = Depends(get_current_user)):
 @api_router.post("/meals/analyze", response_model=MealResponse)
 async def analyze_meal(meal_data: MealAnalyzeRequest, current_user: dict = Depends(get_current_user)):
     try:
-        # Initialize OpenAI chat
-        chat = LlmChat(
-            api_key=OPENAI_API_KEY,
-            session_id=f"meal_analysis_{uuid.uuid4()}",
-            system_message="You are a nutrition expert. Analyze food images and provide accurate nutritional information in JSON format only."
-        ).with_model("openai", "gpt-4o")
-        
-        # Create message with image
-        image_content = ImageContent(image_base64=meal_data.image_base64)
-        
-        user_message = UserMessage(
-            text="""Analyze this food image and provide nutritional information in the following JSON format ONLY (no extra text):
+        # Use OpenAI GPT-4 Vision directly
+        response = await openai_client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a nutrition expert. Analyze food images and provide accurate nutritional information in JSON format only."
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": """Analyze this food image and provide nutritional information in the following JSON format ONLY (no extra text):
 {
   "food_name": "name of the food",
   "calories": estimated calories (number),
   "protein": estimated protein in grams (number),
   "carbs": estimated carbohydrates in grams (number)
 }
-Be as accurate as possible based on typical serving sizes.""",
-            file_contents=[image_content]
+Be as accurate as possible based on typical serving sizes."""
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{meal_data.image_base64}"
+                            }
+                        }
+                    ]
+                }
+            ],
+            max_tokens=500
         )
         
-        # Get response from OpenAI
-        response = await chat.send_message(user_message)
+        response_text = response.choices[0].message.content.strip()
         
         # Parse JSON response
         try:
-            # Try to extract JSON from response
-            response_text = response.strip()
             if "```json" in response_text:
                 response_text = response_text.split("```json")[1].split("```")[0].strip()
             elif "```" in response_text:
@@ -279,7 +289,6 @@ Be as accurate as possible based on typical serving sizes.""",
             
             nutrition_data = json.loads(response_text)
         except:
-            # Fallback parsing
             raise HTTPException(status_code=500, detail="Failed to parse nutrition data from AI response")
         
         # Store meal in database
